@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/urfave/cli"
 )
@@ -37,6 +37,10 @@ func LoadConfiguration(file string) (Config, error) {
 	return config, nil
 }
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Some data Some data Some data Some data Some data")
+}
+
 func main() {
 	filename := "defaultConfig.json"
 	config, err := LoadConfiguration(filename)
@@ -55,7 +59,6 @@ func main() {
 		},
 	}
 
-
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "configFile",
@@ -64,33 +67,43 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) error {
-		if c.NArg() > 0 {
-			filename = c.Args().Get(0)
-		}
-		fmt.Println("The file ", filename, " will be used as a config file")
+		// if c.NArg() > 0 {
+		filename = c.String("configFile") //c.Args().Get(0)
+		// }
+		// fmt.Println(c.Args().Get(0))
+		// fmt.Println(c.String("configFile"))
+		// fmt.Println(filename)
+		// fmt.Println("The file ", filename, " will be used as a config file")
 		return nil
 	}
-
+	// config := Config{}
 	app.Commands = []cli.Command{
 		{
 			Name:  "run",
 			Usage: "Run the proxy server",
 			Action: func(c *cli.Context) error {
-				fmt.Println("Server is running")
+				fmt.Println("Server is running\n")
+				fmt.Printf("%v will be used as configuration file. If you changed your opinion, use reload command\n\n", filename)
 				//TODO
-				//Start a new proxy server 
+				//Start a new proxy server
 				//open in browser... I suppose
+
+				app.Flags[0]
+
+				http.HandleFunc("/", handler)
+				http.ListenAndServe(config.Interface, nil)
+
 				return nil
 			},
 		},
-		{
-			Name: "reload",
-			Usage: "Reload the proxy server. Stops previous one and opens another with new configuration file"
-			Action: func(c *cli.Context) error {
-				fmt.Println("Server is reloaded")
-				return nil
-			}
-		}
+		// {
+		// 	Name: "reload",
+		// 	Usage: "Reload the proxy server. Stops previous one and opens another with new configuration file"
+		// 	Action: func(c *cli.Context) error {
+		// 		fmt.Println("Server is reloaded")
+		// 		return nil
+		// 	}
+		// }
 	}
 
 	err = app.Run(os.Args)
