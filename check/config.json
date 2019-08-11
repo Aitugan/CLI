@@ -1,0 +1,23 @@
+{
+    "interface": ":8080",
+    "upstreams": [
+      {
+        "path": "example1",
+        "method": "GET",
+        "backends": [
+          "http://google.kz",
+          "https://duckduckgo.com"
+        ],
+        "proxyMethod": "round-robin"
+      },
+      {
+        "path": "example2",
+        "method": "GET",
+        "backends": [
+            "https://duckduckgo.com",
+          "http://google.kz"
+        ],
+        "proxyMethod": "anycast"
+      }
+    ]
+  }
