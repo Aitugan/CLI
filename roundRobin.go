@@ -14,11 +14,9 @@ type UpstreamNumber struct {
 
 type RoundRobin struct{}
 
-func (rr *RoundRobin) RoundRobinRunner(interf, path, method string, upstream Upstream) {
-	r := mux.NewRouter()
+func (rr *RoundRobin) RoundRobinRunner(muxer *mux.Router,interf, path, method string, upstream Upstream) {
 	upNum := UpstreamNumber{upstream, 0}
-	r.HandleFunc(path, upNum.roundRobinHandle).Methods(method)
-	http.ListenAndServe(interf, r)
+	muxer.HandleFunc(path, upNum.roundRobinHandle).Methods(method)
 }
 
 func (upstream *UpstreamNumber) roundRobinHandle(w http.ResponseWriter, r *http.Request) {
@@ -32,15 +30,10 @@ func sendRequest(url string) []byte {
 
 	response, err := http.Get(url)
 
-	// Check(err)
-	if err != nil {
-		panic(err)
-	}
+	Check(err)
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	// Check(err)
-	if err != nil {
-		panic(err)
-	}
+	Check(err)
+	
 	return body
 }
