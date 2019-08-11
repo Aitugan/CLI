@@ -47,7 +47,6 @@ func main() {
 	filename := "config.json"
 	config, err := LoadConfiguration(filename)
 	Check(err)
-	fmt.Println(config.Upstreams[0].Path)
 
 	app := cli.NewApp()
 	app.Name = "CLI"
@@ -72,6 +71,8 @@ func main() {
 		filename = c.String("configFile")
 		return nil
 	}
+	muxer := mux.NewRouter()
+
 	app.Commands = []cli.Command{
 		{
 			Name:  "run",
@@ -79,12 +80,15 @@ func main() {
 			Action: func(c *cli.Context) error {
 				fmt.Println("Server is running\n")
 				fmt.Printf("%v will be used as configuration file. If you changed your opinion, use reload command\n\n", filename)
-				// app.Flags[0]
 
-				config, _ := LoadConfiguration("config.json")
 				for i := 0; i < len(config.Upstreams); i++ {
-					RoundRobinRunner(config.Interface, config.Upstreams[i].Path, config.Upstreams[i].Method, config.Upstreams[i])
+					if config.Upstreams[i].ProxyMethod == "round-robin" {
+						RoundRobinRunner(muxer, config.Interface, config.Upstreams[i].Path, config.Upstreams[i].Method, config.Upstreams[i])
+					} else {
+						AnycastRunner(muxer, config.Interface, config.Upstreams[i].Path, config.Upstreams[i].Method, config.Upstreams[i])
+					}
 				}
+				http.ListenAndServe(config.Interface, muxer)
 
 				return nil
 			},
@@ -104,17 +108,18 @@ func main() {
 
 }
 
-///////////////////////////////////////////////////////////////
 type UpstreamNumber struct {
 	Upstream
 	Count int
 }
 
-func RoundRobinRunner(interf, path, method string, upstream Upstream) {
-	r := mux.NewRouter()
+func RoundRobinRunner(muxer *mux.Router, interf, path, method string, upstream Upstream) {
 	upNum := UpstreamNumber{upstream, 0}
-	r.HandleFunc(path, upNum.roundRobinHandle).Methods(method)
-	http.ListenAndServe(interf, r)
+	muxer.HandleFunc(path, upNum.roundRobinHandle).Methods(method)
+}
+
+func AnycastRunner(muxer *mux.Router, interf, path, method string, upstream Upstream) {
+	muxer.HandleFunc(path, upstream.anycastHandler).Methods(method)
 }
 
 func (upstream *UpstreamNumber) roundRobinHandle(w http.ResponseWriter, r *http.Request) {
@@ -124,19 +129,26 @@ func (upstream *UpstreamNumber) roundRobinHandle(w http.ResponseWriter, r *http.
 	upstream.Count = (upstream.Count + 1) % len(upstream.Backends)
 
 }
+
+func (upstream Upstream) anycastHandler(w http.ResponseWriter, r *http.Request) {
+
+	mainCH := make(chan []byte, 1)
+
+	for _, backend := range upstream.Backends {
+		go func(url string, ch chan<- []byte) {
+			ch <- sendRequest(url)
+		}(backend, mainCH)
+	}
+	w.Write(<-mainCH)
+}
+
 func sendRequest(url string) []byte {
 
 	response, err := http.Get(url)
 
-	// Check(err)
-	if err != nil {
-		panic(err)
-	}
+	Check(err)
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	// Check(err)
-	if err != nil {
-		panic(err)
-	}
+	Check(err)
 	return body
 }
