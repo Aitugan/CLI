@@ -1,0 +1,25 @@
+
+{
+  "interface": ":8080",
+  "upstreams": [
+    {
+      "path": "/example2",
+      "method": "GET",
+      "backends": [
+        "https://www.yandex.com/",
+        "https://www.dodopizza.com/"
+      ],
+      "proxyMethod": "anycast"
+    },
+    {
+      "path": "/example1",
+      "method": "GET",
+      "backends": [
+        "https://www.google.com/",
+        "https://dodopizza.kz/"
+      ],
+      "proxyMethod": "round-robin"
+    }
+  ]
+}
+
