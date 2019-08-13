@@ -1,7 +1,7 @@
 package main
 
 import (
-	"CLI/proxyMethod"
+	proxymethod "CLI/proxyMethod"
 	"fmt"
 	"os"
 
@@ -48,9 +48,7 @@ func main() {
 			Action: func(c *cli.Context) error {
 				fmt.Println("Server is running\n")
 				fmt.Printf("%v will be used as configuration file. If you changed your opinion, use reload command\n\n", filename)
-
-				proxyMethod.RunServer(filename)
-
+				proxymethod.RunServer(filename)
 				return nil
 			},
 		},
