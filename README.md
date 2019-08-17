@@ -85,7 +85,7 @@ This is how default configuration file looks like:
   ]
 }
 
-# In order to change configuration file, run CLI, then use special flag for "run" and "reload" commands: $go run main.go run -chf
+# In order to change configuration file, run CLI, then use special flag for "run" and "reload" commands: $go run main.go run example.json OR $go run main.go run example.json -d
 
 
 If you mistakenly entered wrong configuration file or would like to start again, use 
