@@ -1,15 +1,16 @@
 # CLI
 DAR Final Project
 
-# To run it, type $go run main.go run
+# To run CLI, type $go run main.go run
 You should enter some data to configuration file like:
-interface, upstreams with path,method,bacends,proxy method.
+interface, upstreams with path,method,backends,proxy method.
+# To run CLI daemonly, type "$go run main.go run -daemon" or "$go run main.go run -d"
 
 This is how default configuration file looks like:  
 
 {
-  "config": [  
-
+  "config": [
+  
     {    
       "interface": ":8081",  
       "upstreams": [  
@@ -84,8 +85,11 @@ This is how default configuration file looks like:
   ]
 }
 
+# In order to change configuration file, run CLI, then use special flag for "run" and "reload" commands: $go run main.go run -chf
+
+
 If you mistakenly entered wrong configuration file or would like to start again, use 
-# $go run main reload
+$go run main reload
 command
 
 
