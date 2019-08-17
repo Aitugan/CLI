@@ -42,28 +42,16 @@ func main() {
 		},
 	}
 
-	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "configFile",
-			Value: "defaultConfig.json",
-			Usage: "To pass configuration file (if none is provided, default file will be used)",
-		},
-	}
-	app.Action = func(c *cli.Context) error {
-		filename = c.String("configFile")
-		return nil
-	}
-
 	app.Commands = []cli.Command{
 
 		{
 			Name:   "run",
 			Usage:  "Run the proxy server",
-			Action: actionRun,
+			Action: run,
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:        "daemon,d",
-					Usage:       "daemon flag",
+					Usage:       "daemon flag to run CLI on background",
 					Destination: &isDaemon,
 				},
 			},
@@ -72,7 +60,7 @@ func main() {
 			Name:  "reload",
 			Usage: "Reload the proxy server. Stops previous one and opens another with new configuration file",
 			Action: func(c *cli.Context) error {
-				actionRun(c)
+				run(c)
 				actionStop(c)
 				fmt.Println("Server is reloaded")
 				return nil
@@ -125,27 +113,30 @@ func actionStop(c *cli.Context) error {
 		os.Exit(1)
 	}
 
-	fmt.Printf("PID %v stopped!", ProcessID)
+	fmt.Printf("PID %v stopped!\n", ProcessID)
 	return nil
 
 }
 
+func run(c *cli.Context) {
+	if c.Args().First() != "" {
+		filename = c.Args().Get(0)
+	}
+	actionRun(c)
+}
+
 func actionRun(c *cli.Context) error {
+	fmt.Println("Server is running\n")
+	fmt.Printf("%v %T will be used as configuration file. If you changed your opinion, use reload command\n\n", filename, filename)
+
 	if isDaemon {
 		return runDaemon(c)
 	}
-	fmt.Println("Server is running\n")
-	fmt.Printf("%v will be used as configuration file. If you changed your opinion, use reload command\n\n", filename)
 	proxymethod.RunServer(filename)
 	return nil
 }
 
 func runDaemon(ctx *cli.Context) error {
-	if _, err := os.Stat(getPidFilePath()); err == nil {
-		fmt.Println("Running..")
-		os.Exit(1)
-		return nil
-	}
 	cmd := exec.Command(os.Args[0], "run")
 	cmd.Start()
 	fmt.Println("Daemon process ID is : ", cmd.Process.Pid)
