@@ -2,11 +2,16 @@
 package proxymethod
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -23,6 +28,7 @@ type Config struct {
 
 // Upstream structure with information from JSON configuration file
 type Upstream struct {
+	Server
 	Path        string   `json:"path"`
 	Method      string   `json:"method"`
 	Backends    []string `json:"backends"`
@@ -38,6 +44,26 @@ type UpstreamNumber struct {
 type ServerNumber struct {
 	Top
 	CountServ int
+}
+
+type Server struct {
+	srv             *http.Server
+	stopped         bool
+	router          *mux.Router
+	gracefulTimeout time.Duration
+}
+
+func New(srv *http.Server) *Server {
+	router := mux.NewRouter()
+	srv.Handler = router
+	graceTimeout := 5 * time.Second
+
+	return &Server{
+		srv,
+		false,
+		router,
+		graceTimeout,
+	}
 }
 
 // Check if error exists or not
@@ -72,22 +98,34 @@ func SendRequest(url string) []byte {
 func RunServer(filename string) {
 	topConfig, err := LoadConfiguration(filename)
 	Check(err)
-	muxer := mux.NewRouter()
+	// muxer := mux.NewRouter()
+
 	var wg sync.WaitGroup
 	for j := 0; j < len(topConfig.Configure); j++ {
 
+		srv := New(&http.Server{
+			Addr:         topConfig.Configure[j].Interface,
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+			IdleTimeout:  10 * time.Second,
+		})
+		muxer := srv.router
 		for i := 0; i < len(topConfig.Configure[j].Upstreams); i++ {
 			if topConfig.Configure[j].Upstreams[i].ProxyMethod == "round-robin" {
 				RoundRobinRunner(muxer, topConfig.Configure[j].Upstreams[i].Path, topConfig.Configure[j].Upstreams[i].Method, topConfig.Configure[j].Upstreams[i])
 			} else {
 				AnycastRunner(muxer, topConfig.Configure[j].Upstreams[i].Path, topConfig.Configure[j].Upstreams[i].Method, topConfig.Configure[j].Upstreams[i])
 			}
+			// srv.ListenAndServe()
+
 		}
 
+		// srv.
+
 		wg.Add(1)
-		server := &http.Server{Addr: topConfig.Configure[j].Interface, Handler: muxer}
+		// server := &http.Server{Addr: topConfig.Configure[j].Interface, Handler: muxer}
 		go func() {
-			server.ListenAndServe()
+			srv.ListenAndServe()
 			wg.Done()
 		}()
 	}
@@ -95,16 +133,49 @@ func RunServer(filename string) {
 
 }
 
+func (srv *Server) ListenAndServe() error {
+	go func() {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+		<-stop
+		if err := srv.Shutdown(); err != nil {
+			log.Printf("Error:%v\n", err)
+		} else {
+			log.Println("Server stopped")
+		}
+	}()
+	return srv.srv.ListenAndServe()
+}
+
+func (srv *Server) Shutdown() error {
+	srv.stopped = true
+	ctx, cancel := context.WithTimeout(context.Background(), srv.gracefulTimeout)
+	defer cancel()
+	time.Sleep(srv.gracefulTimeout)
+	return srv.srv.Shutdown(ctx)
+}
+
 // AnycastHandler sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes the first response it gets
 func (upstream Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
-	mainCH := make(chan []byte, 1)
-	for _, backend := range upstream.Backends {
-		go func(url string, ch chan<- []byte) {
-			ch <- SendRequest(url)
-		}(backend, mainCH)
+	if upstream.Server.stopped {
+		w.WriteHeader(503)
+		return
 	}
-	w.Write(<-mainCH)
+
+	select {
+	case <-r.Context().Done():
+		w.WriteHeader(503)
+	default:
+
+		mainCH := make(chan []byte, 1)
+		for _, backend := range upstream.Backends {
+			go func(url string, ch chan<- []byte) {
+				ch <- SendRequest(url)
+			}(backend, mainCH)
+		}
+		w.Write(<-mainCH)
+	}
 }
 
 // AnycastRunner runs server with anycast proxy method
@@ -115,12 +186,24 @@ func AnycastRunner(muxer *mux.Router, path, method string, upstream Upstream) {
 // RoundRobinHandle sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes next response by queue
 func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.Request) {
-	w.Write(SendRequest(upstream.Backends[upstream.Count]))
-	upstream.Count = (upstream.Count + 1) % len(upstream.Backends)
+	if upstream.Server.stopped {
+		w.WriteHeader(503)
+		return
+	}
+
+	select {
+	case <-r.Context().Done():
+		w.WriteHeader(503)
+	default:
+		w.Write(SendRequest(upstream.Backends[upstream.Count]))
+		upstream.Count = (upstream.Count + 1) % len(upstream.Backends)
+
+	}
 }
 
 // RoundRobinRunner runs server with round-robin proxy method
 func RoundRobinRunner(muxer *mux.Router, path, method string, upstream Upstream) {
+
 	upNum := UpstreamNumber{upstream, 0}
 	muxer.HandleFunc(path, upNum.RoundRobinHandle).Methods(method)
 }
