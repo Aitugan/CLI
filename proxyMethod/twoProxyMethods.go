@@ -28,7 +28,7 @@ type Config struct {
 
 // Upstream structure with information from JSON configuration file
 type Upstream struct {
-	Server
+	// Server
 	Path        string   `json:"path"`
 	Method      string   `json:"method"`
 	Backends    []string `json:"backends"`
@@ -51,7 +51,12 @@ type Server struct {
 	stopped         bool
 	router          *mux.Router
 	gracefulTimeout time.Duration
+	// Upstream
 }
+
+var (
+	Stopped = false
+)
 
 func New(srv *http.Server) *Server {
 	router := mux.NewRouter()
@@ -102,7 +107,6 @@ func RunServer(filename string) {
 
 	var wg sync.WaitGroup
 	for j := 0; j < len(topConfig.Configure); j++ {
-
 		srv := New(&http.Server{
 			Addr:         topConfig.Configure[j].Interface,
 			ReadTimeout:  5 * time.Second,
@@ -111,19 +115,14 @@ func RunServer(filename string) {
 		})
 		muxer := srv.router
 		for i := 0; i < len(topConfig.Configure[j].Upstreams); i++ {
-			if topConfig.Configure[j].Upstreams[i].ProxyMethod == "round-robin" {
+			switch topConfig.Configure[j].Upstreams[i].ProxyMethod {
+			case "round-robin":
 				RoundRobinRunner(muxer, topConfig.Configure[j].Upstreams[i].Path, topConfig.Configure[j].Upstreams[i].Method, topConfig.Configure[j].Upstreams[i])
-			} else {
+			case "anycast":
 				AnycastRunner(muxer, topConfig.Configure[j].Upstreams[i].Path, topConfig.Configure[j].Upstreams[i].Method, topConfig.Configure[j].Upstreams[i])
 			}
-			// srv.ListenAndServe()
-
 		}
-
-		// srv.
-
 		wg.Add(1)
-		// server := &http.Server{Addr: topConfig.Configure[j].Interface, Handler: muxer}
 		go func() {
 			srv.ListenAndServe()
 			wg.Done()
@@ -148,7 +147,7 @@ func (srv *Server) ListenAndServe() error {
 }
 
 func (srv *Server) Shutdown() error {
-	srv.stopped = true
+	Stopped = true
 	ctx, cancel := context.WithTimeout(context.Background(), srv.gracefulTimeout)
 	defer cancel()
 	time.Sleep(srv.gracefulTimeout)
@@ -157,12 +156,13 @@ func (srv *Server) Shutdown() error {
 
 // AnycastHandler sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes the first response it gets
-func (upstream Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
-	if upstream.Server.stopped {
+func (upstream *Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
+	// srv := Server{}
+	// if srv.stopped {
+	if Stopped {
 		w.WriteHeader(503)
 		return
 	}
-
 	select {
 	case <-r.Context().Done():
 		w.WriteHeader(503)
@@ -186,11 +186,11 @@ func AnycastRunner(muxer *mux.Router, path, method string, upstream Upstream) {
 // RoundRobinHandle sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes next response by queue
 func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.Request) {
-	if upstream.Server.stopped {
+	// if upstream.Upstream.Server.stopped {
+	if Stopped {
 		w.WriteHeader(503)
 		return
 	}
-
 	select {
 	case <-r.Context().Done():
 		w.WriteHeader(503)
