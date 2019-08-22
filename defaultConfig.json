@@ -1,77 +1,120 @@
-
 {
-  "config": [
+  	"config": [
+  
+  	  {
+  		"interface": ":8081",
+  		"upstreams": [
+  		  {
+  			"path": "/oses/anycast",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.apple.com/",
+  			  "https://www.microsoft.com/",
+  			  "https://www.ubuntu.com/",
+  			  "https://www.archlinux.org/"
+  			],
+  			"proxyMethod": "anycast"
+  		  },
+  		  {
+  			"path": "/oses/rr",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.apple.com/",
+  			  "https://www.microsoft.com/",
+  			  "https://www.ubuntu.com/",
+  			  "https://www.archlinux.org/"
+  			],
+  			"proxyMethod": "round-robin"
+  		  },
+  		  {
+			"path": "/oses/rr",
+			"method": "GET",
+			"backends": [
+			  "https://www.apple.com/",
+			  "https://www.microsoft.com/",
+			  "https://www.ubuntu.com/",
+			  "https://www.archlinux.org/"
+			],
+			"proxyMethod": "rabbitMQ-anycast"
+		  }
 
-    {
-      "interface": ":8081",
-      "upstreams": [
-        {
-          "path": "/example2",
-          "method": "GET",
-          "backends": [
-            "https://www.apple.com/",
-            "https://www.microsoft.com/"
-          ],
-          "proxyMethod": "anycast"
-        },
-        {
-          "path": "/example1",
-          "method": "GET",
-          "backends": [
-            "https://github.com",
-            "https://netflix.com/"
-          ],
-          "proxyMethod": "round-robin"
-        }
-      ]
-    },
-
-    {
-      "interface": ":8080",
-      "upstreams": [
-        {
-          "path": "/example2",
-          "method": "GET",
-          "backends": [
-            "https://www.yandex.com/",
-            "https://www.dodopizza.kz/"
-          ],
-          "proxyMethod": "anycast"
-        },
-        {
-          "path": "/example1",
-          "method": "GET",
-          "backends": [
-            "https://www.google.com/",
-            "https://www.youtube.com"
-          ],
-          "proxyMethod": "round-robin"
-        }
-      ]
-    },
-
-    {
-      "interface": ":8082",
-      "upstreams": [
-        {
-          "path": "/example2",
-          "method": "GET",
-          "backends": [
-            "https://www.duckduckgo.com/",
-            "https://en.wikipedia.org/"
-          ],
-          "proxyMethod": "anycast"
-        },
-        {
-          "path": "/example1",
-          "method": "GET",
-          "backends": [
-            "https://code.visualstudio.com/",
-            "https://sublimetext.com/"
-          ],
-          "proxyMethod": "round-robin"
-        }
-      ]
+		]
+  	  },
+  
+  	  {
+  		"interface": ":8080",
+  		"upstreams": [
+  		  {
+  			"path": "/searches/anycast",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.yandex.com/",
+  			  "https://www.google.com/",
+  			  "https://www.bing.com/",
+  			  "https://www.duckduckgo.com/"
+  
+  			],
+  			"proxyMethod": "anycast"
+  		  },
+  		  {
+  			"path": "/searches/rr",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.yandex.com/",
+  			  "https://www.google.com/",
+  			  "https://www.bing.com/",
+  			  "https://www.duckduckgo.com/"
+  			],
+  			"proxyMethod": "round-robin"
+			},
+			{
+				"path": "/searches/rr",
+				"method": "GET",
+				"backends": [
+				  "https://www.yandex.com/",
+				  "https://www.google.com/",
+				  "https://www.bing.com/",
+				  "https://www.duckduckgo.com/"
+				],
+				"proxyMethod": "rabbitMQ-roundrobin"
+			}
+  		]
+  	  },
+  
+  	  {
+  		"interface": ":8082",
+  		"upstreams": [
+  		  {
+  			"path": "/orders/anycast",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.chocofood.kz/",
+  			  "https://www.dodopizza.kz/",
+  			  "https://www.bk.com/"
+  			],
+  			"proxyMethod": "anycast"
+  		  },
+  		  {
+  			"path": "/orders/rr",
+  			"method": "GET",
+  			"backends": [
+  			  "https://www.chocofood.kz/",
+  			  "https://www.dodopizza.kz/",
+  			  "https://www.bk.com/"
+  			],
+  			"proxyMethod": "round-robin"
+			},
+			{
+				"path": "/orders/rr",
+				"method": "GET",
+				"backends": [
+				  "https://www.chocofood.kz/",
+				  "https://www.dodopizza.kz/",
+				  "https://www.bk.com/"
+				],
+				"proxyMethod": "rabbitMQ-anycast"
+			  }
+  		]
+  	  }
+  	]
     }
-  ]
-}
