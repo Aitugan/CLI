@@ -28,7 +28,6 @@ type Config struct {
 
 // Upstream structure with information from JSON configuration file
 type Upstream struct {
-	// Server
 	Path        string   `json:"path"`
 	Method      string   `json:"method"`
 	Backends    []string `json:"backends"`
@@ -51,7 +50,6 @@ type Server struct {
 	stopped         bool
 	router          *mux.Router
 	gracefulTimeout time.Duration
-	// Upstream
 }
 
 var (
@@ -103,8 +101,6 @@ func SendRequest(url string) []byte {
 func RunServer(filename string) {
 	topConfig, err := LoadConfiguration(filename)
 	Check(err)
-	// muxer := mux.NewRouter()
-
 	var wg sync.WaitGroup
 	for j := 0; j < len(topConfig.Configure); j++ {
 		srv := New(&http.Server{
@@ -157,8 +153,6 @@ func (srv *Server) Shutdown() error {
 // AnycastHandler sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes the first response it gets
 func (upstream *Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
-	// srv := Server{}
-	// if srv.stopped {
 	if Stopped {
 		w.WriteHeader(503)
 		return
@@ -186,7 +180,6 @@ func AnycastRunner(muxer *mux.Router, path, method string, upstream Upstream) {
 // RoundRobinHandle sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes next response by queue
 func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.Request) {
-	// if upstream.Upstream.Server.stopped {
 	if Stopped {
 		w.WriteHeader(503)
 		return
