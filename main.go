@@ -23,9 +23,6 @@ func Check(err error) {
 
 var (
 	isDaemon = false
-)
-
-var (
 	filename = os.Getenv("HOME") + "/go/src/CLI/defaultConfig.json"
 )
 
@@ -60,9 +57,13 @@ func main() {
 			Name:  "reload",
 			Usage: "Reload the proxy server. Stops previous one and opens another with new configuration file",
 			Action: func(c *cli.Context) error {
-				run(c)
+				if c.Args().First() != "" {
+					filename = c.Args().Get(0)
+				}
 				actionStop(c)
 				fmt.Println("Server is reloaded")
+				//run(c)
+				actionRun(c)
 				return nil
 			},
 		},
