@@ -52,6 +52,10 @@ type Server struct {
 	gracefulTimeout time.Duration
 }
 
+type RequestSender struct {
+	clnt *http.Client
+}
+
 var (
 	Stopped = false
 )
@@ -86,7 +90,14 @@ func LoadConfiguration(file string) (Top, error) {
 	jsonParser.Decode(&topConfig)
 	return topConfig, nil
 }
-
+// RequestStatus used to test requester
+func (sr *RequestSender) RequestStatus(method, url, server string) *http.Response {
+	request, err := http.NewRequest(method, server+url, nil)
+	Check(err)
+	response, err := sr.clnt.Do(request)
+	Check(err)
+	return response
+}
 // SendRequest takes one of provided backends as an argument to http.Get(), takes response and returns Body of response in []byte format
 func SendRequest(url string) []byte {
 	response, err := http.Get(url)
