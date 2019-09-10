@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strconv"
 
-	// proxymethod "./proxyMethod"
 	proxymethod "CLI/proxyMethod"
 
 	"github.com/urfave/cli"
@@ -20,7 +19,7 @@ func Check(err error) {
 		panic(err)
 	}
 }
-
+// Global variables to check if server should run daemonly or not, and default file name
 var (
 	isDaemon = false
 	filename = os.Getenv("HOME") + "/go/src/CLI/defaultConfig.json"
@@ -78,7 +77,7 @@ func main() {
 	Check(err)
 
 }
-
+// Stops server
 func actionStop(c *cli.Context) error {
 	_, err := os.Stat(getPidFilePath())
 	if err != nil {
@@ -125,7 +124,7 @@ func run(c *cli.Context) {
 	}
 	actionRun(c)
 }
-
+// actionRun runs server  
 func actionRun(c *cli.Context) error {
 	fmt.Println("Server is running\n")
 	fmt.Printf("%v %T will be used as configuration file. If you changed your opinion, use reload command\n\n", filename, filename)
@@ -136,7 +135,7 @@ func actionRun(c *cli.Context) error {
 	proxymethod.RunServer(filename)
 	return nil
 }
-
+// runDaemon is a command that runs server daemonly
 func runDaemon(ctx *cli.Context) error {
 	cmd := exec.Command(os.Args[0], "run")
 	cmd.Start()
@@ -145,11 +144,11 @@ func runDaemon(ctx *cli.Context) error {
 	os.Exit(0)
 	return nil
 }
-
+// returns Pid filepath
 func getPidFilePath() string {
 	return os.Getenv("HOME") + "/go/src/CLI/daemon.pid"
 }
-
+// savePID creates and saves pid file
 func savePID(pid int) {
 	file, err := os.Create(getPidFilePath())
 	if err != nil {
