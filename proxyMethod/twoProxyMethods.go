@@ -1,10 +1,12 @@
-// Package proxymethod Runs server, reads JSON configuration file, gets information, checks which proxy method to run on server
 package proxymethod
+
+// package main
 
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +30,7 @@ type Config struct {
 
 // Upstream structure with information from JSON configuration file
 type Upstream struct {
+	// Server
 	Path        string   `json:"path"`
 	Method      string   `json:"method"`
 	Backends    []string `json:"backends"`
@@ -50,6 +53,7 @@ type Server struct {
 	stopped         bool
 	router          *mux.Router
 	gracefulTimeout time.Duration
+	// isRabbitMQ      bool
 }
 
 type RequestSender struct {
@@ -90,7 +94,7 @@ func LoadConfiguration(file string) (Top, error) {
 	jsonParser.Decode(&topConfig)
 	return topConfig, nil
 }
-// RequestStatus used to test requester
+
 func (sr *RequestSender) RequestStatus(method, url, server string) *http.Response {
 	request, err := http.NewRequest(method, server+url, nil)
 	Check(err)
@@ -98,20 +102,40 @@ func (sr *RequestSender) RequestStatus(method, url, server string) *http.Respons
 	Check(err)
 	return response
 }
+
 // SendRequest takes one of provided backends as an argument to http.Get(), takes response and returns Body of response in []byte format
-func SendRequest(url string) []byte {
-	response, err := http.Get(url)
+func SendRequest(url string, method string, ch chan *http.Response) error { //) []byte {
+	defer func() {
+		if toRecover := recover(); toRecover != nil {
+			fmt.Println("Recovered in serve", toRecover)
+		}
+	}()
+
+	req, err := http.NewRequest(method, url, nil)
 	Check(err)
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	Check(err)
-	return body
+
+	headers, err := json.Marshal(resp.Header)
+	Check(err)
+	log.Printf("%s %s %s", method, url, headers)
+
+	ch <- resp
+	return nil
+
+	// response, err := http.Get(url)
+	// Check(err)
+	// defer response.Body.Close()
+	// body, err := ioutil.ReadAll(response.Body)
+	// Check(err)
+	// return body
 }
 
-// RunServer gets information from JSON configuration file, calls mux.NewRouter() and checks each element in upstreams array. Then it checks it proxy method and runs server
 func RunServer(filename string) {
 	topConfig, err := LoadConfiguration(filename)
 	Check(err)
+
 	var wg sync.WaitGroup
 	for j := 0; j < len(topConfig.Configure); j++ {
 		srv := New(&http.Server{
@@ -135,8 +159,8 @@ func RunServer(filename string) {
 			wg.Done()
 		}()
 	}
-	wg.Wait()
 
+	wg.Wait()
 }
 
 func (srv *Server) ListenAndServe() error {
@@ -158,28 +182,105 @@ func (srv *Server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), srv.gracefulTimeout)
 	defer cancel()
 	time.Sleep(srv.gracefulTimeout)
+	// if srv.isRabbitMQ {
+	// 	err := m.connection.ReleaseConnectionPool()
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	}
+	// 	log.Println("Pool is closed")
+	// }
+
+	log.Println("shutting down")
 	return srv.srv.Shutdown(ctx)
 }
 
-// AnycastHandler sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
-// Each time server reloads takes and writes the first response it gets
-func (upstream *Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
-	if Stopped {
-		w.WriteHeader(503)
-		return
-	}
-	select {
-	case <-r.Context().Done():
-		w.WriteHeader(503)
-	default:
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
+// func (m *MyServer) anycastRequest(upstream Upstream, ch chan *http.Response) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			fmt.Println("Recovered in reliable request", r)
+// 		}
+// 	}()
+// 	response := make(chan *http.Response)
+// 	for _, url := range upstream.Backends {
+// 		go m.sendRequest(url, upstream.Method, response)
+// 	}
 
-		mainCH := make(chan []byte, 1)
-		for _, backend := range upstream.Backends {
-			go func(url string, ch chan<- []byte) {
-				ch <- SendRequest(url)
-			}(backend, mainCH)
+// 	select {
+// 	case d := <-response:
+// 		ch <- d
+// 	case <-time.After(time.Second * 10):
+// 		log.Println("Time out: No news in 10 seconds")
+// 	}
+// }
+
+// func (m *MyServer) rAnycastRequest(upstream Upstream, ch chan *http.Response) {
+
+// 	response := make(chan *http.Response)
+// 	for i := 0; i < 2; i++ {
+// 		go m.anycastRequest(upstream, response)
+// 		select {
+// 		case d := <-response:
+// 			ch <- d
+// 			return
+// 		case <-time.After(time.Second * 10):
+// 			continue
+// 		}
+// 	}
+// }
+
+func (upstream *Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
+	// srv := Server{}
+	// if srv.stopped {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in reliable request", r)
 		}
-		w.Write(<-mainCH)
+	}()
+	response := make(chan *http.Response)
+	for i := 0; i < 2; i++ {
+		go func(upstream *Upstream, ch chan *http.Response, w http.ResponseWriter) {
+			if Stopped {
+				w.WriteHeader(503)
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				w.WriteHeader(503)
+			default:
+
+				defer func() {
+					if toRecover := recover(); toRecover != nil {
+						log.Println("Reliably requested", r)
+					}
+					select {
+
+					case <-time.After(time.Second * 10):
+
+						log.Println("Time out. Nothing in 10 seconds. Anycast")
+
+					}
+
+				}()
+				mainCH := make(chan *http.Response)
+				for _, backend := range upstream.Backends {
+					go func(url string, ch chan *http.Response) {
+						SendRequest(url, upstream.Method, ch)
+					}(backend, mainCH)
+				}
+				select {
+				case bd := <-mainCH:
+					// w.Write([]byte(bd.Body))
+					io.Copy(w, bd.Body)
+				case <-time.After(time.Second * 10):
+					log.Println("Time out error")
+
+				}
+			}
+		}(upstream, response, w)
+
 	}
 }
 
@@ -188,26 +289,57 @@ func AnycastRunner(muxer *mux.Router, path, method string, upstream Upstream) {
 	muxer.HandleFunc(path, upstream.AnycastHandler).Methods(method)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RoundRobinHandle sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes next response by queue
-func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.Request) {
-	if Stopped {
-		w.WriteHeader(503)
-		return
-	}
-	select {
-	case <-r.Context().Done():
-		w.WriteHeader(503)
-	default:
-		w.Write(SendRequest(upstream.Backends[upstream.Count]))
-		upstream.Count = (upstream.Count + 1) % len(upstream.Backends)
+func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.Request) { //(*http.Response) {
+	// if upstream.Upstream.Server.stopped {
+	response := make(chan *http.Response)
+	for range upstream.Backends {
+		go func(upstream *UpstreamNumber, ch chan *http.Response) {
+			if Stopped {
+				w.WriteHeader(503)
+				return
+			}
+			select {
+			case <-r.Context().Done():
+				w.WriteHeader(503)
+			default:
+				// ch := make(chan *http.Response)
+				// defer close(ch)
+				var wg sync.WaitGroup
+				// wg.Add(1)
+				SendRequest(upstream.Backends[upstream.Count], upstream.Upstream.Method, ch)
+				resp := make(chan *http.Response)
+				select {
+				case d := <-resp:
+					ch <- d
+				case <-time.After(time.Second * 10):
+					log.Println("Time out. Nothing in 10 seconds. Round-robin")
+					wg.Wait()
+				}
+				upstream.Count = (upstream.Count + 1) % len(upstream.Backends)
 
+			}
+		}(upstream, response)
+		// select {
+		// case d := <-response:
+		// 	ch <- d
+		// 	return
+		// case <-time.After(time.Second * 10):
+		// 	continue
+		// }
 	}
+	// return
 }
 
 // RoundRobinRunner runs server with round-robin proxy method
 func RoundRobinRunner(muxer *mux.Router, path, method string, upstream Upstream) {
-
 	upNum := UpstreamNumber{upstream, 0}
 	muxer.HandleFunc(path, upNum.RoundRobinHandle).Methods(method)
 }
