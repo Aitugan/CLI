@@ -1,6 +1,12 @@
 # CLI
 ### DAR Final Project. 
-#### This is the project I did in order to receive the certificate of DAR internship. This project widely shows abilities I could gain while being an intern, like creating CLI applications, testing, docummenting, using http methods, extracting data and etc.
+#### This is the project I did in order to receive the certificate of DAR internship. 
+#### It widely shows abilities I could gain while being an intern, like 
+ - creating CLI applications, 
+ - testing, 
+ - docummenting, 
+ - using http methods, 
+ - extracting data and etc.
 
 ##### To run CLI, type $go run main.go run
 You should enter some data to configuration file like:
@@ -86,12 +92,14 @@ This is how default configuration file looks like:
   ]
 }
 
-# In order to change configuration file, run CLI, then use special flag for "run" or "reload" commands: 
-##### $go run main.go run example.json OR $go run main.go run example.json -d
+###### In order to change configuration file, run CLI, then use special flag for "run" or "reload" commands: 
+- $go run main.go run example.json 
+###### OR 
+- $go run main.go run example.json -d
 
 
 ##### If you mistakenly entered wrong configuration file or would like to start again, use 
-##### $go run main reload
+- $go run main reload
 ##### command
 
 
