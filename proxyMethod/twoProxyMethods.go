@@ -124,12 +124,6 @@ func SendRequest(url string, method string, ch chan *http.Response) error { //) 
 	ch <- resp
 	return nil
 
-	// response, err := http.Get(url)
-	// Check(err)
-	// defer response.Body.Close()
-	// body, err := ioutil.ReadAll(response.Body)
-	// Check(err)
-	// return body
 }
 
 func RunServer(filename string) {
@@ -182,54 +176,10 @@ func (srv *Server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), srv.gracefulTimeout)
 	defer cancel()
 	time.Sleep(srv.gracefulTimeout)
-	// if srv.isRabbitMQ {
-	// 	err := m.connection.ReleaseConnectionPool()
-	// 	if err != nil {
-	// 		log.Println(err)
-	// 	}
-	// 	log.Println("Pool is closed")
-	// }
-
 	log.Println("shutting down")
 	return srv.srv.Shutdown(ctx)
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////
-// func (m *MyServer) anycastRequest(upstream Upstream, ch chan *http.Response) {
-// 	defer func() {
-// 		if r := recover(); r != nil {
-// 			fmt.Println("Recovered in reliable request", r)
-// 		}
-// 	}()
-// 	response := make(chan *http.Response)
-// 	for _, url := range upstream.Backends {
-// 		go m.sendRequest(url, upstream.Method, response)
-// 	}
-
-// 	select {
-// 	case d := <-response:
-// 		ch <- d
-// 	case <-time.After(time.Second * 10):
-// 		log.Println("Time out: No news in 10 seconds")
-// 	}
-// }
-
-// func (m *MyServer) rAnycastRequest(upstream Upstream, ch chan *http.Response) {
-
-// 	response := make(chan *http.Response)
-// 	for i := 0; i < 2; i++ {
-// 		go m.anycastRequest(upstream, response)
-// 		select {
-// 		case d := <-response:
-// 			ch <- d
-// 			return
-// 		case <-time.After(time.Second * 10):
-// 			continue
-// 		}
-// 	}
-// }
 
 func (upstream *Upstream) AnycastHandler(w http.ResponseWriter, r *http.Request) {
 	// srv := Server{}
@@ -289,11 +239,6 @@ func AnycastRunner(muxer *mux.Router, path, method string, upstream Upstream) {
 	muxer.HandleFunc(path, upstream.AnycastHandler).Methods(method)
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RoundRobinHandle sends request to provided backends, gets their HTML source code and writes it to webserver, counts till the server with the next index.
 // Each time server reloads takes and writes next response by queue
@@ -327,15 +272,8 @@ func (upstream *UpstreamNumber) RoundRobinHandle(w http.ResponseWriter, r *http.
 
 			}
 		}(upstream, response)
-		// select {
-		// case d := <-response:
-		// 	ch <- d
-		// 	return
-		// case <-time.After(time.Second * 10):
-		// 	continue
-		// }
+
 	}
-	// return
 }
 
 // RoundRobinRunner runs server with round-robin proxy method
